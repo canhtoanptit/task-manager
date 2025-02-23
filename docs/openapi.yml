@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: Task Management API
+  description: API for managing tasks with role-based access control
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        role:
+          type: string
+          enum: [employee, employer]
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [Pending, In Progress, Completed]
+        created_at:
+          type: string
+          format: date-time
+        due_date:
+          type: string
+          format: date-time
+        assignee_id:
+          type: integer
+        created_by:
+          type: integer
+
+    TaskCreate:
+      type: object
+      required:
+        - title
+        - description
+        - due_date
+        - assignee_id
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+        assignee_id:
+          type: integer
+
+    TaskUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [Pending, In Progress, Completed]
+
+    EmployeeSummary:
+      type: object
+      properties:
+        employee_id:
+          type: integer
+        email:
+          type: string
+        total_tasks:
+          type: integer
+        completed_tasks:
+          type: integer
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+paths:
+  /login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+
+  /api/tasks:
+    get:
+      summary: Get all tasks (Employer only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: assignee_id
+          schema:
+            type: integer
+          description: Filter by assignee
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Filter by status
+        - in: query
+          name: sort_by
+          schema:
+            type: string
+            enum: [created_at, due_date, status]
+          description: Sort field
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '403':
+          description: Forbidden
+
+    post:
+      summary: Create a task (Employer only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '200':
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '403':
+          description: Forbidden
+
+  /api/tasks/my-tasks:
+    get:
+      summary: Get employee's assigned tasks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of employee's tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '403':
+          description: Forbidden
+
+  /api/tasks/{id}:
+    patch:
+      summary: Update task status (Employee only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '403':
+          description: Forbidden
+        '404':
+          description: Task not found
+
+  /api/tasks/summary:
+    get:
+      summary: Get employee task summary (Employer only)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Employee task summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeSummary'
+        '403':
+          description: Forbidden
